@@ -1,39 +1,27 @@
-import { NeonGradientCard } from "@/components/magicui/neon-gradient-card";
+import { Button } from "@/components/ui/button"
+import Link from 'next/link'
 
-export default function STTHistory() {
-  const CARDS = [
-    {
-      id: 1,
-      name: "Tony Reichert",
-      role: "CEO",
-      content: "This is a sample transcription.",
-    },
-    {
-      id: 2,
-      name: "Zoey Lang",
-      role: "Tech Lead",
-      content: "Another sample transcription.",
-    },
-    {
-      id: 3,
-      name: "Jane Doe",
-      role: "Designer",
-      content: "Yet another sample transcription.",
-    },
-  ];
+// Mock data for demonstration
+const mockHistory = [
+  { id: 1, date: '2024-03-15', text: 'This is a sample transcription...' },
+  { id: 2, date: '2024-03-14', text: 'Another example of transcribed text...' },
+]
 
+export default function STTHistoryPage() {
   return (
-    <div className="container mx-auto p-4 flex flex-col items-center">
-      <h1 className="text-4xl font-bold mb-8 text-white">STT History</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {CARDS.map((card) => (
-          <NeonGradientCard key={card.id} className="max-w-sm items-center justify-center text-center">
-            <h3 className="text-2xl font-bold text-neutral-800 dark:text-neutral-200">{card.name}</h3>
-            <p className="text-neutral-600 dark:text-neutral-400">{card.role}</p>
-            <p className="mt-4 text-sm text-neutral-600 dark:text-neutral-400">{card.content}</p>
-          </NeonGradientCard>
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-4">STT History</h1>
+      <Link href="/stt">
+        <Button className="mb-4">New Recording</Button>
+      </Link>
+      <ul className="space-y-4">
+        {mockHistory.map((item) => (
+          <li key={item.id} className="bg-white shadow rounded-lg p-4">
+            <p className="text-sm text-gray-500 mb-2">{item.date}</p>
+            <p className="text-gray-800">{item.text}</p>
+          </li>
         ))}
-      </div>
+      </ul>
     </div>
   )
 }
