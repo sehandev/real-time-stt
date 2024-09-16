@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { Button } from "@/components/ui/button"
 import TypingAnimation from '@/components/magicui/typing-animation'
+import { Button } from '@/components/ui/button'
+import { useEffect, useRef, useState } from 'react'
 
 export default function STTRecorder() {
   const [isRecording, setIsRecording] = useState(false)
