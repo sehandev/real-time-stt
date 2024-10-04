@@ -1,0 +1,22 @@
+[project]
+name = "py-stt"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [{ name = "Sungdon Kim", email = "sehandev@gmail.com" }]
+dependencies = [
+    "pyaudio>=0.2.14",
+    "setuptools-rust>=1.10.2",
+    "numba==0.55.2",
+    "numpy>=1.22.4",
+    "torch>=2.4.1",
+    "lightning-whisper-mlx>=0.0.10",
+]
+requires-python = ">=3.10,<3.11"
+readme = "README.md"
+license = { text = "MIT" }
+
+[tool.pdm]
+distribution = false
+
+[tool.pdm.scripts]
+start = { call = "src.py_stt:main" }
