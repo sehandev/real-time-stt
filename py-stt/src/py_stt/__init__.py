@@ -5,19 +5,7 @@ import numpy as np
 import pyaudio
 from lightning_whisper_mlx import LightningWhisperMLX
 from scipy.io.wavfile import write
-
-# Constants
-SAMPLE_RATE = 16000
-CHUNK_SIZE = 1600
-SAMPLE_WIDTH = 2
-VAD_THRESHOLD = 1e-5
-FREQ_THRESHOLD = 100.0
-STEP_MS = 0  # 0 to enable VAD
-LENGTH_MS = 4000
-VAD_WINDOW_SIZE_MS = 1000
-MODEL_NAME = "large-v3"
-BATCH_SIZE = 4
-QUANT = "8bit"
+from src.py_stt.config_manager import ConfigManager
 
 
 def vad_simple(
@@ -70,16 +58,16 @@ def main():
     stream = audio.open(
         format=pyaudio.paInt16,
         channels=1,
-        rate=SAMPLE_RATE,
+        rate=ConfigManager.SAMPLE_RATE,
         input=True,
-        frames_per_buffer=CHUNK_SIZE,
+        frames_per_buffer=ConfigManager.CHUNK_SIZE,
     )
 
     # Initialize Whisper model
     whisper = LightningWhisperMLX(
-        model=MODEL_NAME,
-        batch_size=BATCH_SIZE,
-        quant=QUANT,
+        model=ConfigManager.MODEL_NAME,
+        batch_size=ConfigManager.BATCH_SIZE,
+        quant=ConfigManager.QUANT,
     )
 
     # Initialize variables
@@ -92,44 +80,49 @@ def main():
     # Main loop
     while is_running:
         # Read audio data from the stream
-        data = stream.read(CHUNK_SIZE, exception_on_overflow=False)
+        data = stream.read(ConfigManager.CHUNK_SIZE, exception_on_overflow=False)
         pcm16 = np.frombuffer(data, dtype=np.int16)
         pcmf32_new = pcm16.astype(np.float32) / 32768.0
 
         # Accumulate audio data for VAD
         pcmf32_vad = np.concatenate((pcmf32_vad, pcmf32_new))
 
-        if len(pcmf32_vad) >= VAD_WINDOW_SIZE_MS * SAMPLE_RATE / 1000:
-            if vad_simple(
-                pcmf32_vad,
-                SAMPLE_RATE,
-                VAD_WINDOW_SIZE_MS,
-                VAD_THRESHOLD,
-                FREQ_THRESHOLD,
-                False,
-            ):
-                # Voice activity detected, accumulate audio data for Whisper
-                pcmf32 = pcmf32_vad.copy()
-                while len(pcmf32) < LENGTH_MS * SAMPLE_RATE / 1000:
-                    data = stream.read(CHUNK_SIZE, exception_on_overflow=False)
-                    pcm16 = np.frombuffer(data, dtype=np.int16)
-                    pcmf32_new = pcm16.astype(np.float32) / 32768.0
-                    pcmf32 = np.concatenate((pcmf32, pcmf32_new))
+        if len(pcmf32_vad) < ConfigManager.VAD_WINDOW_SIZE_SAMPLES:
+            print('VAD_WINDOW_SIZE_SAMPLES')
+            continue
 
-                # Save audio data to a WAV file
-                with tempfile.NamedTemporaryFile(
-                    delete=False, suffix=".wav"
-                ) as tmpfile:
-                    write(tmpfile.name, SAMPLE_RATE, (pcmf32 * 32767).astype(np.int16))
-                    # Transcribe audio using Whisper
-                    result = whisper.transcribe(audio_path=tmpfile.name)
-                    print(result["text"])
-                    os.unlink(tmpfile.name)  # Delete the temporary file after use
+        is_voice_activity_detected = vad_simple(
+            pcmf32_vad,
+            ConfigManager.SAMPLE_RATE,
+            ConfigManager.VAD_WINDOW_SIZE_MS,
+            ConfigManager.VAD_THRESHOLD,
+            ConfigManager.FREQ_THRESHOLD,
+            False,
+        )
+        if not is_voice_activity_detected:
+            print("none")
+            continue
 
-                n_iter += 1
+        # Voice activity detected, accumulate audio data for Whisper
+        pcmf32 = pcmf32_vad.copy()
+        while len(pcmf32) < ConfigManager.VAD_LENGTH_SAMPLES:
+            data = stream.read(ConfigManager.CHUNK_SIZE, exception_on_overflow=False)
+            pcm16 = np.frombuffer(data, dtype=np.int16)
+            pcmf32_new = pcm16.astype(np.float32) / 32768.0
+            pcmf32 = np.concatenate((pcmf32, pcmf32_new))
 
-            # Reset VAD buffer
-            pcmf32_vad = np.array([], dtype=np.float32)
+        # Save audio data to a WAV file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmpfile:
+            data = (pcmf32 * 32767).astype(np.int16)
+            write(tmpfile.name, ConfigManager.SAMPLE_RATE, data)
+            result = whisper.transcribe(audio_path=tmpfile.name)
+            print(result["text"])
+            os.unlink(tmpfile.name)  # Delete the temporary file after use
+
+        n_iter += 1
+
+        # Reset VAD buffer
+        pcmf32_vad = np.array([], dtype=np.float32)
 
     # Close the stream and terminate PyAudio
     stream.stop_stream()
