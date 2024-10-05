@@ -2,61 +2,63 @@
 
 import TypingAnimation from '@/components/magicui/typing-animation'
 import { Button } from '@/components/ui/button'
-import { useEffect, useRef, useState } from 'react'
+import { useSTTStore } from '@/store/stt'
+import { useEffect, useState } from 'react'
 
 export default function STTRecorder() {
   const [isRecording, setIsRecording] = useState(false)
   const [transcript, setTranscript] = useState('')
+  const { addTranscript } = useSTTStore()
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const recognitionRef = useRef<SpeechRecognition | null>(null)
-  const audioChunksRef = useRef<Blob[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-      recognitionRef.current = new SpeechRecognition()
-      recognitionRef.current.continuous = true
-      recognitionRef.current.interimResults = true
-      recognitionRef.current.lang = 'en-US'
+      const newRecognition = new SpeechRecognition()
+      newRecognition.continuous = true
+      newRecognition.interimResults = true
 
-      recognitionRef.current.onresult = (event) => {
-        const result = event.results[event.results.length - 1]
-        const transcriptText = result[0].transcript
-        setTranscript((prev) => prev + ' ' + transcriptText)
+      newRecognition.onresult = (event) => {
+        const currentTranscript = Array.from(event.results)
+          .map((result) => result[0].transcript)
+          .join(' ')
+        setTranscript(currentTranscript)
+      }
+
+      newRecognition.onerror = (event) => {
+        console.error('Speech recognition error', event.error)
+        setIsRecording(false)
+        setError(`Speech recognition error: ${event.error}`)
+      }
+      setRecognition(newRecognition)
+    }
+
+    return () => {
+      if (recognition) {
+        recognition.stop()
       }
     }
   }, [])
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      mediaRecorderRef.current = new MediaRecorder(stream)
-      audioChunksRef.current = []
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data)
-      }
-
-      mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' })
-        const audioUrl = URL.createObjectURL(audioBlob)
-        setAudioUrl(audioUrl)
-      }
-
-      mediaRecorderRef.current.start()
-      recognitionRef.current?.start()
-      setIsRecording(true)
-      setAudioUrl(null) // Clear previous recording
-    } catch (error) {
-      console.error('Error accessing microphone:', error)
+  const startRecording = () => {
+    setError(null)
+    setIsRecording(true)
+    setTranscript('')
+    if (recognition) {
+      recognition.start()
     }
   }
 
   const stopRecording = () => {
-    mediaRecorderRef.current?.stop()
-    recognitionRef.current?.stop()
     setIsRecording(false)
+    if (recognition) {
+      recognition.stop()
+    }
+    addTranscript(transcript)
+    // Add logic here to set the audioUrl if needed
+    // setAudioUrl(/* URL of the recorded audio */)
   }
 
   return (
@@ -79,6 +81,11 @@ export default function STTRecorder() {
           )}
         </div>
       </div>
+      {error && (
+        <div className="mt-4 text-red-500">
+          {error}
+        </div>
+      )}
     </div>
   )
 }
